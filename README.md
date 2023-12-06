@@ -1,4 +1,4 @@
-# CoRA: **Co**-located **R**elightable **A**vatar
+# *CoRA*: *Co*-located *R*elightable *A*vatar
 
 <img src="misc/teaser.gif" width="100%" >
 
@@ -15,7 +15,7 @@ Yuxuan Han, Junfeng Lyu, and Feng Xu
 ## About Code Release
 We plan to release the full code (including the data preprocessing pipeline, training code, and the automatic 3D assets export scripts) to support the users to use our project to create their own authentic relightable scan at home.
 
-The code will be released upon the paper is accepted, or maybe more eailer. Stay tuned.
+The code will be released upon the paper is accepted, or maybe more earlier. Stay tuned.
 
 ## Contact
 If you have any questions, please contact Yuxuan Han (hanyx22@mails.tsinghua.edu.cn).
