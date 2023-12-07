@@ -8,7 +8,7 @@ This is a PyTorch implementation of the following paper:
 
 Yuxuan Han, Junfeng Lyu, and Feng Xu
 
-[Project Page]() | [Video]() | [Paper]()
+[Project Page](https://yxuhan.github.io/CoRA/index.html) | [Video](https://www.youtube.com/watch?v=A2xNUcj_Mtk) | [Paper](https://arxiv.org/abs/2312.03442)
 
 **Abstract**: *Facial geometry and appearance capture have demonstrated tremendous success in 3D scanning real humans in studios. Recent works propose to democratize this technique while keeping the results high quality. However, they are still inconvenient for daily usage. In addition, they focus on an easier problem of only capturing facial skin. This paper proposes a novel method for high-quality face capture, featuring an easy-to-use system and the capability to model the complete face with skin, mouth interior, hair, and eyes. We reconstruct facial geometry and appearance from a single co-located smartphone flashlight sequence captured in a dim room where the flashlight is the dominant light source (\emph{e.g.} rooms with curtains or at night). To model the complete face, we propose a novel hybrid representation to effectively model both eyes and other facial regions, along with novel techniques to learn it from images. We apply a combined lighting model to compactly represent real illuminations and exploit a morphable face albedo model as a reflectance prior to disentangle diffuse and specular. Experiments show that our method can capture high-quality 3D relightable scans.*
 
@@ -27,7 +27,7 @@ Please cite the following paper if this model helps your research:
     @inproceedings{han2023cora,
         author = {Han, Yuxuan and Lyu, Junfeng and Xu, Feng},
         title = {High-Quality Facial Geometry and Appearance Capture at Home},
-        booktitle = {technical report},
+        journal={arXiv preprint arXiv:2312.03442},
         year={2023}
     }
 
