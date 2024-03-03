@@ -36,7 +36,7 @@ class Shader(nn.Module):
         view_dir = F.normalize(view_dir, dim=-1)
         
         if light_pos_world is None:
-            light_pos_world = view_pos_world
+            light_pos_world = view_pos_world  # for co-located setup
             # light_pos_cam = torch.zeros_like(view_pos_world)
             # light_pos_world = (c2w[:3, :3] @ light_pos_cam[..., None] + c2w[:3, 3:])[..., 0]  # [3] or [n,3]
         
@@ -86,8 +86,6 @@ class VolumeMaterial(nn.Module):
             self.len_diff, self.len_spec = 3, 2
             self.min_roughness = brdf_cfg["min_roughness"]
             self.max_roughness = brdf_cfg["max_roughness"]
-            self.max_specular = brdf_cfg.get("max_specular", 1.)
-            self.min_specular = brdf_cfg.get("min_specular", 0.)
         else:
             raise NotImplementedError
         
@@ -115,7 +113,6 @@ class VolumeMaterial(nn.Module):
             spec = torch.sigmoid(spec)
             roughness = spec[..., 1:2]
             specular = spec[..., :1]
-            specular = specular * self.min_specular + (1 - specular) * self.max_specular
             roughness = roughness * self.min_roughness + (1 - roughness) * self.max_roughness
             spec = {
                 "specular": specular,

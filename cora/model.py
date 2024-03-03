@@ -2,8 +2,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import random
-import trimesh
 
 from .networks import (
     BetaNetwork, VolumeMaterial, VolumeRadianceHead, VolumeSDF, Shader, EyeballSDF
@@ -18,11 +16,12 @@ class NeuSAvatar(nn.Module):
         self.num_levels = cfg["network"]["num_levels"]
         self.level_dim = cfg["network"]["level_dim"]
         self.neighbor_eps = cfg["network"]["neighbor_eps"]
-        # self.lr_scale = 10.
         self.light_scale = torch.nn.parameter.Parameter(torch.tensor([1.]))
         self.light_intensity = torch.tensor(cfg["light"]["color"]) * cfg["light"]["intensity"]
         self.gamma = cfg["light"]["gamma"]
         self.device = cfg["device"]
+
+        # activate the Instant-NGP grid gradually, see the progressive training strategy in NeuS2
         self.level_mask = torch.ones(self.num_levels * self.level_dim)
         
         self._set_networks()
@@ -61,7 +60,7 @@ class NeuSAvatar(nn.Module):
 
     def forward_material(self, x):
         '''
-        return diff and spec
+        return diff and spec params
         '''
         return self.material(x)
         
@@ -81,6 +80,7 @@ class NeuSAvatar(nn.Module):
                 torch.zeros_like(x[..., :1]),  # dummy density
                 torch.zeros_like(x),
             )
+
         out = self.query_attributes(
             x, return_brdf=True, return_normal=True, ignore_eyeball=ignore_eyeball,
         )
@@ -106,11 +106,13 @@ class NeuSAvatar(nn.Module):
             fsdf, rsdf, lsdf,
         ], dim=-1)
         
+        # sample perturbed points the same way as PermutoSDF
         with torch.no_grad():
             rand_dir = torch.randn_like(normal)
             rand_dir = F.normalize(rand_dir, dim=-1)
             pert_dir = torch.cross(rand_dir, normal)
             x_eps = x + self.neighbor_eps * pert_dir * torch.randn_like(normal[..., -1:])
+        
         out = self.query_attributes(
             x_eps, return_brdf=True, return_normal=True, ignore_eyeball=ignore_eyeball,
         )
@@ -222,7 +224,6 @@ class NeuSAvatar(nn.Module):
         self.batch = data
         renderer = trainer.renderer
         render_step_size = trainer.render_step_size
-        sample_patch = trainer.sample_patch
 
         ########
         # psrse data
@@ -279,21 +280,6 @@ class NeuSAvatar(nn.Module):
         })
         loss += (loss_l1_pred + loss_l1_recon) * cfg["loss"]["w_l1"] + loss_mask * cfg["loss"]["w_mask"]
         
-        # loss_s3im = self.s3im_loss(recon, pixels)
-        # loss += loss_s3im * cfg["loss"]["w_l1"]
-        # loss_dict["loss_s3im"] = loss_s3im
-
-        if sample_patch:  # compute LPIPS loss
-            patch_size = 64
-            num_patch = recon.shape[0] // (patch_size ** 2)
-            recon_patch = recon.reshape(num_patch, patch_size, patch_size, 3).permute(0, 3, 1, 2)
-            pixels_patch = pixels.reshape(num_patch, patch_size, patch_size, 3).permute(0, 3, 1, 2)
-            loss_patch_lpips = trainer.lpips_loss(recon_patch, pixels_patch, normalize=True).mean()
-            loss_dict.update({
-                "loss_vol_lpips": loss_patch_lpips,
-            })
-            loss += loss_patch_lpips * cfg["loss"]["w_lpips"]
-
         # eikonal loss
         sdf_grad_samples = sample_attr_dict["sdf_grad"]
         eikonal = (torch.linalg.norm(sdf_grad_samples, ord=2, dim=-1) - 1.) ** 2
@@ -339,14 +325,6 @@ class NeuSAvatar(nn.Module):
         loss_eps_n = torch.mean(eps_weight * (1.0 - torch.sum(n * n_eps, dim=-1, keepdim=True))) * num_sample
         loss_dict["loss_eps_n"] = loss_eps_n
         loss += loss_eps_n
-
-        # regularize the specular smooth
-        # num_sample = len(sample_weights) / num_rays
-        # sa_eps = sample_attr_dict["eps_specular"]
-        # sa = sample_attr_dict["specular"]
-        # loss_eps_sa = torch.mean((sa - sa_eps).abs()) * num_sample
-        # loss_dict["loss_eps_sa"] = loss_eps_sa
-        # loss += loss_eps_sa * cfg["loss"]["w_eps_sa"]
 
         # update num of rays
         num_rays_update = int(
@@ -413,9 +391,6 @@ class NeuSAvatar(nn.Module):
             "SSIM": trainer.ssim_loss(color, gt, window_size=3).mean().item(),
             "PSNR": trainer.psnr_loss(color, gt, max_val=1.).item(),
             "LPIPS": trainer.lpips_loss(color, gt, normalize=True).mean().item(),
-            # "SSIM": trainer.ssim_loss(color ** (self.gamma), gt ** (self.gamma), window_size=3).mean().item(),
-            # "PSNR": trainer.psnr_loss(color ** (self.gamma), gt ** (self.gamma), max_val=1.).item(),
-            # "LPIPS": trainer.lpips_loss(color ** (self.gamma), gt ** (self.gamma), normalize=True).mean().item(),
             "vis": torch.cat([
                 diff_ldr, spec_ldr * 3, recon, gt, normal, mask_leye * gt, mask_reye * gt, mask_face * gt
             ], dim=-1),
@@ -633,9 +608,6 @@ class NeuSAvatar(nn.Module):
             "SSIM": trainer.ssim_loss(color, gt, window_size=3).mean().item(),
             "PSNR": trainer.psnr_loss(color, gt, max_val=1.).item(),
             "LPIPS": trainer.lpips_loss(color, gt, normalize=True).mean().item(),
-            # "SSIM": trainer.ssim_loss(color ** (self.gamma), gt ** (self.gamma), window_size=3).mean().item(),
-            # "PSNR": trainer.psnr_loss(color ** (self.gamma), gt ** (self.gamma), max_val=1.).item(),
-            # "LPIPS": trainer.lpips_loss(color ** (self.gamma), gt ** (self.gamma), normalize=True).mean().item(),
             "vis": torch.cat([
                 diff_ldr, spec_ldr * 3, color, gt, normal,
             ], dim=-1),
@@ -649,9 +621,6 @@ class NeuSAvatar(nn.Module):
         }
 
     def compute_mask_step(self, trainer, ignore_eyeball=False):
-        '''
-        只在clean mesh时被调用
-        '''
         # parse params
         cfg = trainer.cfg
         data = trainer.val_data

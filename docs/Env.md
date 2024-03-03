@@ -46,6 +46,12 @@ pip install nerfacc==0.3.1 \
 
 6. Install Blender for UV unwrap:
 ```
-wget https://mirror.clarkson.edu/blender/release/Blender3.1/blender-3.1.0-linux-x64.tar.xz
+cd blender
+
+# Download Blender
+wget https://mirror.clarkson.edu/blender/release/Blender3.1/blender-3.1.0-linux-x64.tar.xz or download from https://cloud.tsinghua.edu.cn/f/44a204b6c5824133ad92/?dl=1
+
+
+# extract files
 tar -xvf blender-3.1.0-linux-x64.tar.xz
 ```

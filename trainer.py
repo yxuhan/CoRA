@@ -2,28 +2,19 @@ import os
 import argparse
 import yaml
 import math
-import random
 import numpy as np
 from tqdm import tqdm
 import torch
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
-from torchvision import transforms
-from PIL import Image
 from torchvision.utils import save_image
 from nerfacc import OccupancyGrid
 import lpips
 import kornia
-import cv2
 import trimesh
-from moviepy.editor import ImageSequenceClip
 import pymeshlab
 import pymeshfix
 from pytorch3d.utils import ico_sphere
-from pytorch3d.structures import Pointclouds
-from pytorch3d.io import IO
-from scipy.spatial.transform import Rotation
-import json
 
 from cora.extract_geometry import extract_geometry
 from cora.mesh_renderer import MeshRenderer
@@ -34,16 +25,18 @@ from cora.model import NeuSAvatar as Network
 
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('--config_path', type=str, default="config/config_colocated_INSTA.yaml")
+parser.add_argument('--config_path', type=str)
 parser.add_argument('--ckpt_path', type=str, default=None)
 parser.add_argument(
     '--mode', type=str, default="train", choices=[
-        "train", "export", "export_eyeball", "export_5sdf", "export_pc", "test", "paper",
+        "train", "export_eyeball",
     ]
 )
+
 # these options can overwrite the same options in configs if specified
 parser.add_argument('--device', type=str)
 parser.add_argument('--chunk_size', type=int)
+
 # save path configs
 parser.add_argument('--save_visual_dir', type=str, default="workspace/visual")
 
@@ -147,27 +140,16 @@ class Trainer:
             for k in attr:
                 try:
                     attr[k] = attr[k].reshape(self.HEIGHT, self.WIDTH, -1)
-                except:  # for c2w, cam_idx, ...
+                except:
                     pass
         return attr, origins, viewdirs
 
-    def _process_data(self, data, test=False, sample_patch=False):
-        if sample_patch:
-            data["attr"] = data["patch_attr"]
-            x, y = data["patch_x"], data["patch_y"]
-        else:
-            data["attr"] = data["rand_attr"]
-            x, y = data["rand_x"], data["rand_y"]
+    def _process_data(self, data, test=False):
+        data["attr"] = data["rand_attr"]
+        x, y = data["rand_x"], data["rand_y"]
         
-        # shooting rays
         intrinsic = data["intrinsic"]
         c2w = data["attr"]["c2w"]
-        
-        # apply camera offsets
-        # cur_cam_offset = self.camera_offset(data["attr"]["cam_offset_idx"].to(self.device))[0]  # [nray,3,4]
-        # last_row = torch.tensor([[0, 0, 0, 1.]], device=self.device)[None, ...].repeat(len(c2w), 1, 1)  # [nray,1,4]
-        # cur_cam_offset_4x4 = torch.cat([cur_cam_offset, last_row], dim=1)  # [nray,4,4]
-        # c2w = c2w @ cur_cam_offset_4x4
 
         attr = data["attr"]  # [nray,4]
         point_attrs, origins, viewdirs = self._compute_rays(c2w, x, y, attr, intrinsic, reshape=test)
@@ -243,26 +225,13 @@ class Trainer:
                 self.precompute_faces = torch.from_numpy(precompute_mesh.faces).to(self.device)[None, ...]
                 export_material = True
 
-            try:
-                self.sample_patch = self.step > cfg["train"]["sample_patch_iter"] \
-                    and cfg["train"]["sample_patch"] and random.random() > 0.5
-            except:
-                self.sample_patch = False
-
-            if self.step > cfg["data"].get("fix_sh_iter", 5000):
-                try:
-                    self.radiance_field.fix_light_sh()
-                except:
-                    pass
-
             # load data
             dataset = self.train_dataset
             train_data = dataset[np.random.randint(0, len(dataset))]
-            self.train_data = self._process_data(train_data, test=False, sample_patch=self.sample_patch and not self.mesh_render)
+            self.train_data = self._process_data(train_data, test=False)
 
             # compute loss
             self.radiance_field.train()
-            # self.renderer.update_step(self.step)
             self.radiance_field.update_step(self)
             self.occupancy_grid.every_n_step(
                 step=self.step,
@@ -474,9 +443,9 @@ class Trainer:
             print("UV unwarping ...")
             
             # Blender UV
-            blender_path = "../blender-3.1.0-linux-x64/blender"
+            blender_path = "blender/blender-3.1.0-linux-x64/blender"
             os.system(
-                "%s --background --python utils/export_blender.py %s %s" % (
+                "%s --background --python blender/export_blender.py %s %s" % (
                     blender_path, mesh_save_path, mesh_uv_save_path,
                 )
             )
@@ -562,9 +531,9 @@ class Trainer:
         mesh_np.export(mesh_save_path)
 
         # Blender UV
-        blender_path = "../blender-3.1.0-linux-x64/blender"
+        blender_path = "blender/blender-3.1.0-linux-x64/blender"
         os.system(
-            "%s --background --python utils/export_blender.py %s %s" % (
+            "%s --background --python blender/export_blender.py %s %s" % (
                 blender_path, mesh_save_path, mesh_uv_save_path,
             )
         )
@@ -607,18 +576,7 @@ class Trainer:
         normal_list = torch.cat(normal_list, dim=0).reshape(h, w, -1).permute(2, 0, 1)
         save_image(diff_list, diff_save_path)
         save_image((normal_list + 1) / 2, normal_save_path)
-        post_process(export_dir)
-
-    def export_material(self):
-        '''
-        目前只支持导出静态avatar的材质
-        '''
-        self._load_checkpoints()
-        self.radiance_field.eval()
-        self._export_matrial_fn(
-            export_dir=self.opt.save_visual_dir,
-            dataset=self.test_exp_dataset,
-        )
+        # post_process(export_dir)
     
     def export_eyeball_material(self):
         self._load_checkpoints()
@@ -642,51 +600,10 @@ class Trainer:
         )    
 
 
-def post_process(export_dir):
-    diff_path = os.path.join(export_dir, "diffuse.png")
-    spec_path = os.path.join(export_dir, "specular.png")
-    rough_path = os.path.join(export_dir, "roughness.png")
-    normal_path = os.path.join(export_dir, "normal.png")
-    coord_path = os.path.join(export_dir, "coord.pkl")
-    
-    coord_img = torch.load(coord_path, map_location="cpu")
-    mask = (torch.mean(coord_img.abs(), dim=1, keepdim=True) == 0).float()  # [h,w,1]
-    mask_np = (mask[0, 0, ..., None].numpy() * 255).astype(np.uint8)
-    try:
-        diff_img = cv2.imread(diff_path)
-        diff_inpaint = cv2.inpaint(diff_img, mask_np, 3 ,cv2.INPAINT_TELEA)
-        cv2.imwrite(diff_path, diff_inpaint)
-    except:
-        pass
-    
-    try:
-        spec_img = cv2.imread(spec_path)
-        spec_inpaint = cv2.inpaint(spec_img, mask_np, 3 ,cv2.INPAINT_TELEA)
-        cv2.imwrite(spec_path, spec_inpaint)
-    except:
-        pass
-
-    try:
-        rough_img = cv2.imread(rough_path)
-        rough_inpaint = cv2.inpaint(rough_img, mask_np, 3 ,cv2.INPAINT_TELEA)
-        cv2.imwrite(rough_path, rough_inpaint)
-    except:
-        pass
-    
-    try:
-        normal_img = cv2.imread(normal_path)
-        normal_inpaint = cv2.inpaint(normal_img, mask_np, 3 ,cv2.INPAINT_TELEA)
-        cv2.imwrite(normal_path, normal_inpaint)
-    except:
-        pass
-
-
 if __name__ == "__main__":
     trainer = Trainer(opt)
     if opt.mode == "train":
         trainer.train()
-    elif opt.mode == "export":
-        trainer.export_material()
     elif opt.mode == "export_eyeball":
         trainer.export_eyeball_material()
     else:
