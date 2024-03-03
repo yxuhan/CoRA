@@ -1,2 +1,7 @@
-misc/*.mp4
+.vscode/*
+__pycache__/*
+*.py[cod]
 
+
+data/*
+workspace/*
