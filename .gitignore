@@ -6,6 +6,8 @@ __pycache__/*
 data/*
 workspace/*
 run/*
+video/*
+*.pth
 
 blender/blender-3.1.0-linux-x64.tar.xz
 blender/blender-3.1.0-linux-x64/*

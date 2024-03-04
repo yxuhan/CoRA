@@ -18,11 +18,10 @@ Yuxuan Han, Junfeng Lyu, and Feng Xu
 
 ## Document
 To use our codebase to create your own 3D relightable avatar, we provide the following documents:
-1. [Env.md](docs/Env.md) for code environment setup.
+1. [Env.md](docs/Env.md) for code environment setup. 
+    * If you just want to quickly run the code on our released dataset, you can directly goto [Run.md](docs/Run.md).
 1. [Capture.md](docs/Capture.md) for instructions to capture video under our setup, i.e. co-located video in a dim room where the smartphone flashlight is the dominant light source.
-    * We provide some example videos captured by ourself at [here](). If you want to test our code quickly, you can just use these videos.
 1. [Preprocess.md](docs/Preprocess.md) for video preprocessing. 
-    * We provide the processed version of our captured video at [here](). If you want to test our code quickly, you can just use this dataset.
 1. [Run.md](docs/Run.md) for scripts to train our method on the preprocessed dataset to reconstruct relightable avatar.
 
 We also plan to create a video toturial to help users to create their own relightable avatar using our codebase. Stay tuned.
