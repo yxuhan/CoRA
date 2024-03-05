@@ -32,7 +32,6 @@ pip install nerfacc==0.3.1 \
     pyyaml \
     lpips \
     tensorboard \
-    opencv-python==4.5.2.52 \
     scikit-learn \
     PyMCubes==0.1.2 \
     trimesh \
@@ -46,7 +45,13 @@ pip install nerfacc==0.3.1 \
     pyfacer \
     av \
     pims \
-    timm
+    timm \
+    face_alignment \
+    mediapipe \
+    opencv-python==4.5.2.52 \
+    opencv-python-headless==4.5.2.52 \
+    chumpy \
+    numpy==1.22.4
 ```
 
 6. Install Blender for UV unwrap:

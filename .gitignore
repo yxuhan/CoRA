@@ -8,6 +8,7 @@ workspace/*
 run/*
 video/*
 *.pth
+scripts/AlbedoMMFitting/data/FLAME2020/*
 
 blender/blender-3.1.0-linux-x64.tar.xz
 blender/blender-3.1.0-linux-x64/*

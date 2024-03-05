@@ -75,7 +75,7 @@ python scripts/apply_mask.py --data_root workspace/data/old_neutral
 ```
 
 ## Step 3: Camera calibration
-Use [MetaShape](https://www.agisoft.com/) to calibrate the camera parameters. After running MetaShape, you would get the results like [this](). Then, put them into `workspace/data/old_neutral` and rename them to `metashape_recon.obj` and `metashape_recon.xml`. The folder structure should be:
+Use [MetaShape](https://www.agisoft.com/) to calibrate the camera parameters. After running MetaShape, you would get the results like [this](https://cloud.tsinghua.edu.cn/f/4fcdca6b686540ee8db7/?dl=1). Then, unzip and put them into `workspace/data/old_neutral` and rename them to `metashape_recon.obj` and `metashape_recon.xml`. The folder structure should be:
 
 ```
 |- workspace/data/old_neutral
@@ -112,11 +112,21 @@ python scripts/mica_compute_identity.py \
 ```
 
 ### Run fitting
-First you need to prepare some files
-
-After obtain the identity parameters `identity.npy`, you can run AlbedoMM fitting.
+First you need to prepare some files in `scripts/AlbedoMMFitting/data/FLAME2020`, i.e. `generic_model.pkl` and `albedoModel2020_FLAME_albedoPart.npz`:
+```
+|- scripts/AlbedoMMFitting/data/FLAME2020
+    |- albedoModel2020_FLAME_albedoPart.npz  # download from https://github.com/waps101/AlbedoMM/releases
+    |- generic_model.pkl  # copy this file from the MICA repo
 ```
 
+Now, you can run AlbedoMM fitting.
+```
+cd scripts/AlbedoMMFitting
+python fitting.py \
+    --data_root ../../workspace/data/old_neutral \
+    --save_root ../../workspace/fitting/old_neutral
+python enlarge_specular.py --data_root ../../workspace/data/old_neutral
+cd ../..
 ```
 
 ## In the end
