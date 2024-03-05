@@ -41,6 +41,6 @@ Please cite the following paper if this model helps your research:
     }
 
 ## Acknowledgments
-* The code is built on a bunch of wonderful projects, including [Nerfacc](https://github.com/nerfstudio-project/nerfacc), [tinycudann](https://github.com/NVlabs/tiny-cuda-nn), [facer](https://github.com/FacePerceiver/facer), [metrical-tracker](https://github.com/Zielon/metrical-tracker), and [WildLight](https://github.com/za-cheng/WildLight).
+* The code is built on a bunch of wonderful projects, including: [Nerfacc](https://github.com/nerfstudio-project/nerfacc), [tinycudann](https://github.com/NVlabs/tiny-cuda-nn), [facer](https://github.com/FacePerceiver/facer), [metrical-tracker](https://github.com/Zielon/metrical-tracker), [AlbedoMM](https://github.com/waps101/AlbedoMM), [RobustVideoMatting](https://github.com/PeterL1n/RobustVideoMatting), and [WildLight](https://github.com/za-cheng/WildLight).
 * Thanks [SoulShell](http://soulshell.cn/) for providing their Light Stage to help us conduct comparison experiments.
 * Thanks [Jingwang Ling](https://gerwang.github.io/) and [Zhibo Wang](https://sireer.github.io/) for helpful discussions.

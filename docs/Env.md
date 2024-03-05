@@ -41,7 +41,12 @@ pip install nerfacc==0.3.1 \
     networks \
     scikit-image==0.19.1 \
     fvcore \
-    iopath
+    iopath \
+    pymeshfix \
+    pyfacer \
+    av \
+    pims \
+    timm
 ```
 
 6. Install Blender for UV unwrap:
