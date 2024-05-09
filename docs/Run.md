@@ -1,7 +1,7 @@
 # Running
 
 ## Training on the preprocessed dataset
-Download a dataset from [here](https://cloud.tsinghua.edu.cn/d/0d9bef2214dd42dc95d7/), e.g. old_neutral.zip.
+Download a dataset from [here](https://cloud.tsinghua.edu.cn/f/86613e4585af4122b2ae/), e.g. old_neutral.zip.
 Then, unzip it in the data folder, the directory structure should be:
 ```
 |-data
@@ -48,7 +48,7 @@ python trainer.py \
     --device 0
 ```
 
-We manually label the left eye and right eye mask on the UV diffuse map. See the example images `diffuse_leye_mask.png` and `diffuse_reye_mask.png` in the [provided dataset](https://cloud.tsinghua.edu.cn/d/0d9bef2214dd42dc95d7/) (the eyes region is painted with RGB [1,1,1]) for reference::
+We manually label the left eye and right eye mask on the UV diffuse map. See the example images `diffuse_leye_mask.png` and `diffuse_reye_mask.png` in the [provided dataset](https://cloud.tsinghua.edu.cn/f/86613e4585af4122b2ae/) (the eyes region is painted with RGB [1,1,1]) for reference::
 
 <img src="../misc/diffuse_leye_mask.png" width="40%" >
 <img src="../misc/diffuse_reye_mask.png" width="40%" >
@@ -60,14 +60,21 @@ python scripts/render_uv_eye_mask.py \
     --mesh_uv_path workspace/export/old_neutral_wo-hybrid/mesh_uv.obj
 ```
 
-Next, we manually label the eyeball landmarks on the UV diffuse map. See the example images `diffuse_leye_landmark.png` and `diffuse_reye_landmark.png` in the [provided dataset](https://cloud.tsinghua.edu.cn/d/0d9bef2214dd42dc95d7/)(4 landmarks are painted with RGB [0,1,0] for each eye) for reference:
+Next, we manually label the eyeball landmarks on the UV diffuse map. See the example images `diffuse_leye_landmark.png` and `diffuse_reye_landmark.png` in the [provided dataset](https://cloud.tsinghua.edu.cn/f/86613e4585af4122b2ae/)(4 landmarks are painted with RGB [0,1,0] for each eye) for reference:
 
 <img src="../misc/diffuse_leye_landmark.jpg" width="40%" >
 <img src="../misc/diffuse_reye_landmark.jpg" width="40%" >
 
-Using the following scripts, we can convert it to 3D landmarks.
+Using the following scripts, we can convert it to 3D landmarks:
 ```
-
+# for left eye
+python scripts/print_3d_eyeball_landmarks.py \
+    --ldm_img_path data/old_neutral/diffuse_leye_landmark.png \
+    --coord_path workspace/export/old_neutral_wo-hybrid/coord.pkl
+# for right eye
+python scripts/print_3d_eyeball_landmarks.py \
+    --ldm_img_path data/old_neutral/diffuse_reye_landmark.png \
+    --coord_path workspace/export/old_neutral_wo-hybrid/coord.pkl
 ```
 
 After running the above scripts, you need to copy the printed 3D landmark position list to the config file like this:
@@ -75,16 +82,16 @@ After running the above scripts, you need to copy the printed 3D landmark positi
 data: {
     ...
     left_eye_ldm: [
-        [-0.3164336383342743, -0.18279047310352325, 0.19412003457546234],
-        [-0.2668660283088684, -0.19570477306842804, 0.20923510193824768],
-        [-0.28190210461616516, -0.17798882722854614, 0.23827917873859406],
-        [-0.21853820979595184, -0.171295166015625, 0.22779381275177002],
+        [-0.2853277623653412, 0.06871829926967621, 0.248100146651268],
+        [-0.3563520014286041, 0.0770021602511406, 0.24544201791286469],
+        [-0.3374285399913788, 0.03722478821873665, 0.24707964062690735],
+        [-0.3867684602737427, 0.03126110881567001, 0.21448980271816254],
     ],
     right_eye_ldm: [
-        [0.019469600170850754, -0.1688525378704071, 0.28486162424087524],
-        [0.07669556140899658, -0.19646050035953522, 0.29582440853118896],
-        [0.06701074540615082, -0.16873115301132202, 0.3271498382091522],
-        [0.12527015805244446, -0.1823343187570572, 0.315157413482666],
+        [0.06962595134973526, 0.1554494947195053, 0.3642164170742035],
+        [0.00429929792881012, 0.17564578354358673, 0.36422595381736755],
+        [0.011260660365223885, 0.13016416132450104, 0.3623243272304535],
+        [-0.044418856501579285, 0.13413679599761963, 0.3284035921096802],
     ],
     ...
 }
