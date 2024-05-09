@@ -136,6 +136,7 @@ class MetaShapeDataset(Dataset):
             x = torch.randint(0, self.WIDTH, size=(num_rays,)).to(self.device)
             y = torch.randint(0, self.HEIGHT, size=(num_rays,)).to(self.device)
             cam_idx = torch.randint(0, self.num_frames, size=(num_rays,)).to(self.device)
+            cam_offset_idx = torch.clone(cam_idx)
         else:
             x, y = torch.meshgrid(
                 torch.arange(self.WIDTH),
@@ -145,6 +146,7 @@ class MetaShapeDataset(Dataset):
             x = x.flatten().to(self.device)
             y = y.flatten().to(self.device)
             cam_idx = torch.tensor([index]).long().to(self.device)
+            cam_offset_idx = torch.tensor([self.cam_idx[index]]).long().to(self.device)
         
         img = self.images[cam_idx, y, x]
         render_mask = self.masks[cam_idx, y, x]
@@ -163,6 +165,8 @@ class MetaShapeDataset(Dataset):
             "reye_mask": render_right_eye_mask,
             "bfm_albedo": render_bfm_albedo,
             "c2w": self.cam2world[cam_idx],  # [nray,4,4]
+            "cam_idx": cam_idx,
+            "cam_offset_idx": cam_offset_idx,
         }
 
         color_bkgd = torch.tensor([0, 0, 0]).float().to(self.device)

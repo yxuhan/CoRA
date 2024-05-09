@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from .networks import (
     BetaNetwork, VolumeMaterial, VolumeRadianceHead, VolumeSDF, Shader, EyeballSDF
 )
+from .utils import diffuse2sh, SH_xyz
 
 
 class NeuSAvatar(nn.Module):
@@ -23,8 +24,26 @@ class NeuSAvatar(nn.Module):
 
         # activate the Instant-NGP grid gradually, see the progressive training strategy in NeuS2
         self.level_mask = torch.ones(self.num_levels * self.level_dim)
+
+        self.sh_order = 3
+        self.diff_sh = diffuse2sh(order=self.sh_order, device=self.device)  # [n]
+        self.sh_scale = cfg["data"].get("sh_scale", 0.1)
+        self.light_sh = torch.nn.parameter.Parameter(torch.zeros(3, self.sh_order ** 2))  # [3,n]
+        self.light_sh_fix = None
+        self.occ_mask_sh = torch.nn.parameter.Parameter(torch.zeros(500, self.sh_order ** 2, 1))  # enough for all the view
+        self.view_idx = None
+
+        self.softplus_beta = cfg["data"].get("beta", 10.)
         
         self._set_networks()
+
+        # load 3D eyes landmarks
+        self.leye_landmarks = self.cfg["data"].get("left_eye_ldm", None)
+        if self.leye_landmarks is not None:
+            self.leye_landmarks = torch.tensor(self.leye_landmarks).float().to(self.device)  # [n,3]
+        self.reye_landmarks = self.cfg["data"].get("right_eye_ldm", None)
+        if self.reye_landmarks is not None:
+            self.reye_landmarks = torch.tensor(self.reye_landmarks).float().to(self.device)
 
     def _set_networks(self):
         num_levels = self.num_levels
@@ -64,8 +83,8 @@ class NeuSAvatar(nn.Module):
         '''
         return self.material(x)
         
-    def forward(self, x, view_dir, view_pos, dist2, c2w, light_pos=None, only_render_mask=False, 
-                ignore_eyeball=False, **kwargs):
+    def forward(self, x, view_dir, view_pos, dist2, c2w, ray_idx, light_pos=None, only_render_mask=False, 
+                ignore_eyeball=False, is_val=False, **kwargs):
         if only_render_mask:
             out = self.query_attributes(
                 x, return_brdf=False, return_normal=False, detach_normal=True, ignore_eyeball=ignore_eyeball,
@@ -74,13 +93,16 @@ class NeuSAvatar(nn.Module):
             return torch.zeros_like(density), density, torch.zeros_like(x)
         
         if len(x) == 0:
-            n_attr_chns = 20 + 4
+            n_attr_chns = 20 + 7 + 1
             return (
                 torch.zeros(*x[..., 0].size(), n_attr_chns).to(x.device),  # dummy attrs
                 torch.zeros_like(x[..., :1]),  # dummy density
                 torch.zeros_like(x),
             )
-
+        
+        if not is_val:
+            self.view_idx = self.view_idx[ray_idx]
+        
         out = self.query_attributes(
             x, return_brdf=True, return_normal=True, ignore_eyeball=ignore_eyeball,
         )
@@ -100,6 +122,7 @@ class NeuSAvatar(nn.Module):
         spec_shading = spec_shading * self.light_intensity.to(x.device)
         diff_shading = diff_shading / dist2
         spec_shading = spec_shading / dist2
+        diff_sh_shading, occ_mask = self.compute_sh_diff_shading(diff_color, normal.detach())
         
         attrs = torch.cat([
             color, normal, diff_shading, spec_shading, grad, spec_params["specular"], sdf, 
@@ -117,9 +140,34 @@ class NeuSAvatar(nn.Module):
             x_eps, return_brdf=True, return_normal=True, ignore_eyeball=ignore_eyeball,
         )
         normal_eps, spec_eps = out["normal"], out["spec"]["specular"]
-        attrs = torch.cat([attrs, normal_eps, spec_eps], dim=-1)
+        attrs = torch.cat([attrs, normal_eps, spec_eps, diff_sh_shading, occ_mask], dim=-1)
         
         return attrs, density, density_obj
+
+    def compute_sh_diff_shading(self, diff, normal):
+        '''
+        diff: [b,3]
+        normal: [b,3]
+        '''
+        dx, dy, dz = normal[..., :1], normal[..., 1:2], normal[..., 2:]  # [b,1]
+        cnt = 0
+        diff_shading = torch.zeros_like(diff)
+        occ_mask = torch.zeros_like(diff[..., :1])
+        occ_mask_sh = self.occ_mask_sh[self.view_idx]
+        for l in range(self.sh_order):
+            for m in range(-l, l + 1):
+                # shade_sh = self.diff_sh[..., l] * self.light_sh[..., cnt]  # [3]
+                act_sh = SH_xyz(l, m, dx, dy, dz)
+                if self.light_sh_fix is not None:
+                    shade_sh = self.light_sh_fix[..., cnt]
+                else:
+                    shade_sh = self.light_sh[..., cnt]  # [3]  # directly use 3-order SH to represent pre-conv envmap
+                diff_shading += shade_sh * act_sh
+                occ_mask += occ_mask_sh[:, cnt] * act_sh
+                cnt += 1
+        occ_mask = torch.sigmoid(occ_mask)
+        sh_diff_shading = F.softplus(diff_shading, beta=self.softplus_beta) * occ_mask * diff * self.sh_scale
+        return sh_diff_shading, occ_mask
 
     def query_attributes(self, x, return_brdf=False, return_normal=False, detach_normal=False, 
                          ignore_eyeball=False):
@@ -208,6 +256,8 @@ class NeuSAvatar(nn.Module):
             "leye_sdf": attrs[..., 19:20],
             "eps_normal": attrs[..., 20:23],
             "eps_specular": attrs[..., 23:24],
+            "sh_diff_shading": attrs[..., 24:27],
+            "occ_mask": attrs[..., 27:28],
         }
         return attr_dict
 
@@ -234,6 +284,8 @@ class NeuSAvatar(nn.Module):
         mask = data["mask"]
         leye_mask = data["leye_mask"]
         reye_mask = data["reye_mask"]
+        view_idx = data["cam_offset_idx"]
+        self.view_idx = view_idx
         
         ########
         # network forward
@@ -255,9 +307,10 @@ class NeuSAvatar(nn.Module):
         attr_dict = self.get_attr_dict(attr)
         sample_attr_dict = self.get_attr_dict(sample_attrs)
         diff_shading = attr_dict["diff_shading"]
+        sh_diff_shading = attr_dict["sh_diff_shading"]
         spec_shading = attr_dict["spec_shading"]
         pred = attr_dict["color"]
-        recon = diff_shading + spec_shading
+        recon = diff_shading + spec_shading + sh_diff_shading
         acc_scene = acc[..., :1]
         acc_face = acc[..., 1:2]
         acc_leye = acc[..., 2:3]
@@ -326,6 +379,19 @@ class NeuSAvatar(nn.Module):
         loss_dict["loss_eps_n"] = loss_eps_n
         loss += loss_eps_n
 
+        # sphere-eyeball landmarks loss
+        loss_ldm = torch.tensor(0.).to(self.device)
+        lcenter, rcenter = self.eyeball.get_world_eyeball_center()
+        eye_size = self.eyeball.get_world_eyeball_size()
+        if self.leye_landmarks is not None:
+            dist2 = torch.sum((self.leye_landmarks - lcenter) ** 2, dim=-1)
+            loss_ldm += (dist2.sqrt() - eye_size).abs().mean()
+        if self.reye_landmarks is not None:
+            dist2 = torch.sum((self.reye_landmarks - rcenter) ** 2, dim=-1)
+            loss_ldm += (dist2.sqrt() - eye_size).abs().mean()
+        loss += loss_ldm * cfg["loss"].get("w_ldm", 0.)
+        loss_dict["loss_ldm"] = loss_ldm
+
         # update num of rays
         num_rays_update = int(
             num_rays
@@ -349,6 +415,8 @@ class NeuSAvatar(nn.Module):
         render_bkgd = data["color_bkgd"]
         rays = data["rays"]
         pixels = data["pixels"]
+        view_idx = data["cam_offset_idx"]
+        self.view_idx = view_idx
         
         ########
         # network forward
@@ -359,11 +427,14 @@ class NeuSAvatar(nn.Module):
             render_bkgd=render_bkgd,
             test_chunk_size=cfg["renderer"]["chunk_size"],
             c2w=data["c2w"],
+            is_val=True,
             **kwargs,
         )
 
         attr_dict = self.get_attr_dict(attr)
         diff = attr_dict["diff_shading"]
+        sh_diff = attr_dict["sh_diff_shading"]
+        occ_mask = attr_dict["occ_mask"]
         spec = attr_dict["spec_shading"]
         normal = attr_dict["normal"]
         color = attr_dict["color"]
@@ -375,13 +446,16 @@ class NeuSAvatar(nn.Module):
         mask_reye = acc[..., 3:4].permute(2, 0, 1)
         color = color.permute(2, 0, 1)[None, ...]
         diff = diff.permute(2, 0, 1)[None, ...]
+        sh_diff = sh_diff.permute(2, 0, 1)[None, ...]
+        occ_mask = occ_mask.permute(2, 0, 1)[None, ...].expand_as(sh_diff)
         spec = spec.permute(2, 0, 1)[None, ...]
-        recon = (spec + diff) ** (1 / self.gamma)
+        recon = (spec + diff + sh_diff).clamp(min=1e-6) ** (1 / self.gamma)
         color = color ** (1 / self.gamma)
         color = recon if inv_render else color
         
         # vis
         diff_ldr = diff ** (1 / self.gamma)
+        sh_diff_ldr = sh_diff.clamp(min=1e-6) ** (1 / self.gamma)
         spec_ldr = spec
         gt = pixels.permute(2, 0, 1)[None, ...]
         normal = F.normalize(normal, dim=-1)
@@ -392,7 +466,8 @@ class NeuSAvatar(nn.Module):
             "PSNR": trainer.psnr_loss(color, gt, max_val=1.).item(),
             "LPIPS": trainer.lpips_loss(color, gt, normalize=True).mean().item(),
             "vis": torch.cat([
-                diff_ldr, spec_ldr * 3, recon, gt, normal, mask_leye * gt, mask_reye * gt, mask_face * gt
+                occ_mask, sh_diff_ldr, diff_ldr, spec_ldr * 3, recon, gt, 
+                normal, mask_leye * gt, mask_reye * gt, mask_face * gt
             ], dim=-1),
             "mask": mask,
         }
@@ -407,6 +482,9 @@ class NeuSAvatar(nn.Module):
 
         train_data = trainer.train_data
         cfg = trainer.cfg
+
+        view_idx = train_data["cam_offset_idx"]
+        self.view_idx = view_idx
 
         cam_ext = torch.inverse(train_data["attr"]["c2w"][0])[:-1][None, ...]  # [1,3,4]
         cam_pos = train_data["origins"][0]  # [3]
@@ -453,24 +531,28 @@ class NeuSAvatar(nn.Module):
             normal_flat_vis = F.normalize(grad, dim=-1)
 
         # shading
+        sh_diff_shading, _ = self.compute_sh_diff_shading(diff, normal_flat_vis.detach())
         diff_shading, spec_shading = self.shader.shading(
             pos_world=coord_flat_vis, diff_color=diff, spec_params=spec, normal=normal_flat_vis,
             view_pos_world=cam_pos, light_pos_world=None, c2w=train_data["c2w"],
         )
         diff_shading = diff_shading * self.light_intensity.to(x.device)  # [nvis,3]
         spec_shading = spec_shading * self.light_intensity.to(x.device)  # [nvis,3]
+        sh_diff_res = torch.zeros_like(coord_flat)
         diff_res = torch.zeros_like(coord_flat)
         spec_res = torch.zeros_like(coord_flat)
         spec_brdf_res = torch.zeros_like(coord_flat[..., :1])
+        sh_diff_res[vis_mask] = sh_diff_shading
         diff_res[vis_mask] = diff_shading
         spec_res[vis_mask] = spec_shading
         spec_brdf_res[vis_mask] = spec["specular"]
+        sh_diff_res = sh_diff_res.reshape(1, height, width, -1).permute(0, 3, 1, 2)
         diff_res = diff_res.reshape(1, height, width, -1).permute(0, 3, 1, 2) / dist2_img
         spec_res = spec_res.reshape(1, height, width, -1).permute(0, 3, 1, 2) / dist2_img
         spec_brdf_res = spec_brdf_res.reshape(1, height, width, -1).permute(0, 3, 1, 2)
 
         # compute loss
-        pred = diff_res + spec_res  # [1,3,h,w]
+        pred = diff_res + spec_res + sh_diff_res  # [1,3,h,w]
         pixels = train_data["pixels"].reshape(1, height, width, -1).permute(0, 3, 1, 2) ** self.gamma
         diff_mask = train_data["diff_mask"].reshape(1, height, width, -1).permute(0, 3, 1, 2)
         gt_spec_albedo = data["bfm_albedo"].reshape(1, height, width, -1).permute(0, 3, 1, 2)
@@ -508,11 +590,14 @@ class NeuSAvatar(nn.Module):
         self.batch = data
         pixels = data["pixels"]
         gt_mask = data["mask"]
+
+        view_idx = data["cam_offset_idx"]
+        self.view_idx = view_idx
         
         vertices = trainer.precompute_vertices
         faces = trainer.precompute_faces
 
-        msaa = 2
+        msaa = 1
         cam_int = torch.clone(data["intrinsic"])  # [3,3]
         cam_int[0] /= trainer.WIDTH
         cam_int[1] /= trainer.HEIGHT
@@ -571,20 +656,24 @@ class NeuSAvatar(nn.Module):
             normal_flat_vis = F.normalize(grad, dim=-1)
 
         # shading
+        sh_diff_shading, _ = self.compute_sh_diff_shading(diff, normal_flat_vis.detach())
         diff_shading, spec_shading = self.shader.shading(
             pos_world=coord_flat_vis, diff_color=diff, spec_params=spec, normal=normal_flat_vis,
             view_pos_world=cam_pos, light_pos_world=None, c2w=val_data["c2w"],
         )
         diff_shading = diff_shading * self.light_intensity.to(x.device)  # [nvis,3]
         spec_shading = spec_shading * self.light_intensity.to(x.device)  # [nvis,3]
+        sh_diff_res = torch.zeros_like(coord_flat)
         diff_res = torch.zeros_like(coord_flat)
         spec_res = torch.zeros_like(coord_flat)
         normal_res = torch.zeros_like(coord_flat)
         spec_brdf_res = torch.zeros_like(coord_flat[..., :1])
+        sh_diff_res[vis_mask] = sh_diff_shading
         diff_res[vis_mask] = diff_shading
         spec_res[vis_mask] = spec_shading
         normal_res[vis_mask] = normal_flat_vis
         spec_brdf_res[vis_mask] = spec["specular"]
+        sh_diff_res = sh_diff_res.reshape(1, height, width, -1).permute(0, 3, 1, 2)
         diff_res = diff_res.reshape(1, height, width, -1).permute(0, 3, 1, 2) / dist2_img
         spec_res = spec_res.reshape(1, height, width, -1).permute(0, 3, 1, 2) / dist2_img
         normal_res = normal_res.reshape(1, height, width, -1).permute(0, 3, 1, 2)
@@ -592,13 +681,15 @@ class NeuSAvatar(nn.Module):
 
         # compute image loss
         spec_res = F.avg_pool2d(spec_res, kernel_size=msaa, stride=msaa)
+        sh_diff_res = F.avg_pool2d(sh_diff_res, kernel_size=msaa, stride=msaa)
         diff_res = F.avg_pool2d(diff_res, kernel_size=msaa, stride=msaa)
         normal_res = F.avg_pool2d(normal_res, kernel_size=msaa, stride=msaa)
         mask_img = F.avg_pool2d(mask_img, kernel_size=msaa, stride=msaa)
-        color = (spec_res + diff_res) ** (1 / self.gamma)
+        color = (spec_res + diff_res + sh_diff_res).clamp(min=1e-6) ** (1 / self.gamma)
         
         # vis
         diff_ldr = diff_res ** (1 / self.gamma)
+        sh_diff_ldr = sh_diff_res.clamp(min=1e-6) ** (1 / self.gamma)
         spec_ldr = spec_res.clamp(min=0.01) ** (1 / self.gamma)
         gt = pixels.permute(2, 0, 1)[None, ...]
         gt_mask = gt_mask.permute(2, 0, 1)[None, ...]
@@ -609,11 +700,12 @@ class NeuSAvatar(nn.Module):
             "PSNR": trainer.psnr_loss(color, gt, max_val=1.).item(),
             "LPIPS": trainer.lpips_loss(color, gt, normalize=True).mean().item(),
             "vis": torch.cat([
-                diff_ldr, spec_ldr * 3, color, gt, normal,
+                sh_diff_ldr, diff_ldr, spec_ldr * 3, color, gt, normal,
             ], dim=-1),
             "mask": mask_img,
             "diff_ldr": diff_ldr,
             "spec_ldr": spec_ldr,
+            "sh_diff_ldr": sh_diff_ldr,
             "recon": color,
             "gt": gt,
             "gt_mask": gt_mask,
