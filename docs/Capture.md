@@ -5,6 +5,15 @@ Any smartphone with a flashlight is OK.
 
 All the results shown in the paper are obtained by videos captured by an IPhone X.
 
+Note the flashlight color and intensity and gamma (convert the srgb space to linear space) differ across different types of smartphones, you can set it in the config:
+```
+light: {
+  intensity: 8.,
+  color: [1, 1.25, 0.7],
+  gamma: 2.2,
+}
+```
+
 ## Capture Site
 To ensure that the smartphone flashlight is the dominant light source to meet our assumption, we suggest capturing data in a bedroom at night or other times with curtains drawn.
 Besides, you should turn off all other lamps (e.g., the roof lights or the lamp on the table) in your bedroom.
