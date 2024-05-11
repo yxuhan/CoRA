@@ -1,6 +1,6 @@
 ### News
-* `2024/5/9` we are working on a journal extension of CoRA where the eyeball position and radius are **automatically solved** from the data instead of manually set as in the CVPR'24 version; this part of code is now released! Stay tuned for the journal version paper.
-* `2024/5/9` We have released the scripts and instructions to run on custom data!
+* `2024/5/11` We are working on a journal extension of CoRA where the eyeball position and radius are **automatically solved** from the data instead of manually set as in the CVPR'24 version; this part of code is now released! Stay tuned for the journal version paper.
+* `2024/5/11` We have released the scripts and instructions to run on custom data!
 * `2024/3/3` We have released the full code to run on our preprocessed dataset, see [Run.md](docs/Run.md) for more details.
 
 

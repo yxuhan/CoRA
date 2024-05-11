@@ -48,7 +48,7 @@ python trainer.py \
     --device 0
 ```
 
-We manually label the left eye and right eye mask on the UV diffuse map. See the example images `diffuse_leye_mask.png` and `diffuse_reye_mask.png` in the [provided dataset](https://cloud.tsinghua.edu.cn/f/86613e4585af4122b2ae/) (the eyes region is painted with RGB [1,1,1]) for reference::
+We manually label the left eye and right eye mask on the UV diffuse map. See the example images `diffuse_leye_mask.png` and `diffuse_reye_mask.png` in the [provided dataset](https://cloud.tsinghua.edu.cn/f/86613e4585af4122b2ae/) (the eyes region is painted with RGB [1,1,1]) for reference:
 
 <img src="../misc/diffuse_leye_mask.png" width="40%" >
 <img src="../misc/diffuse_reye_mask.png" width="40%" >
@@ -98,7 +98,7 @@ data: {
 ```
 See `data/old_neutral/config.yaml` for the reference.
 
-*Note: all the things done in Step 1 can be replaced by the automatic method. We can use the face parsing network to obtain the left and right eye mask for each frame and the landmark detection method (triangularize multi-view 2D landmarks) to obtain 3D eyeball landmarks.*
+*Note: All the things done in Step 1 can be replaced by the automatic method. We can use the face parsing network to obtain the left and right eye mask for each frame and the landmark detection method (triangularize multi-view 2D landmarks) to obtain 3D eyeball landmarks. We empirically find manually label these things produce better results so in the released code we suggest you to also do these things manually.*
 
 ### Step 2
 In the second step, we have already obtain the eyes mask and the 3D eyeball landmarks, we can diretly run the full method as using our preprocessed dataset:
