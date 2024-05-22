@@ -41,7 +41,7 @@ The software should meet the following standards:
 We use [ProMovie](https://promovieapp.com/) for data capture which can be downloaded from the AppStore for IOS users.
 For Android users, please find appropriate software by yourself and pull a request to tell us if you succeed; thanks in advance. 
 
-If you are using ProMovie for data capture, we suggest you set the speed of the camera to around 53, the ISO to 300, and the white balance to 4900K:
+If you are using ProMovie for data capture, we suggest you set the shutter speed of the camera to around 53, the ISO to 300, and the white balance to 4900K:
 
 <img src="../misc/exposure.jpg" width="100%" >
 
