@@ -88,7 +88,37 @@ Use [MetaShape](https://www.agisoft.com/) to calibrate the camera parameters. Af
 
 *NOTE: the quality of camera parameters play an important role in our method, and we find COLMAP **cannot** give high-quality reconstruction results in our pilot experiments.*
 
-*If you are not familar with MetaShape, we will provide a video toturial to show how to obtain these files. Stay tuned.*
+*If you are not familar with MetaShape, we provide a toturial here to show how to obtain these files.*
+
+<details>
+<summary>Obtain Metashape files</summary>
+Firstly, add image to Metashape:
+
+<img src="../misc/add_img1.png">
+
+<img src="../misc/add_img2.png">
+
+<img src="../misc/add_img3.png">
+
+Then, align camera and export camera, name it to `metashape_recon.xml`:
+
+<img src="../misc/align_cam1.png">
+
+<img src="../misc/align_cam2.png">
+
+<img src="../misc/align_cam3.png">
+
+<img src="../misc/export_cam.png">
+
+Finally, build model and export model, name it to `metashape_recon.obj`:
+
+<img src="../misc/build_model1.png">
+
+<img src="../misc/build_model2.png">
+
+<img src="../misc/export_model.png">
+
+</details>
 
 Next, convert MetaShape camera coordinates to `transforms.json`.
 ```
