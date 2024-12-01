@@ -1,28 +1,5 @@
 import os
 import argparse
-import yaml
-import math
-import numpy as np
-from tqdm import tqdm
-import torch
-import torch.nn.functional as F
-from torch.utils.tensorboard import SummaryWriter
-from torchvision.utils import save_image
-from nerfacc import OccupancyGrid
-import lpips
-import kornia
-import trimesh
-import pymeshlab
-import pymeshfix
-from pytorch3d.utils import ico_sphere
-
-from cora.extract_geometry import extract_geometry
-from cora.mesh_renderer import MeshRenderer
-from cora.dataset import MetaShapeDataset as AvatarDataset
-from cora.renderer import ObjSDFRenderer as Renderer
-from cora.renderer import Rays
-from cora.model import NeuSAvatar as Network
-
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--config_path', type=str)
@@ -45,6 +22,29 @@ opt, _ = parser.parse_known_args()
 
 os.environ["CUDA_VISIBLE_DEVICES"] = opt.device
 opt.device = "cuda"
+
+import yaml
+import math
+import numpy as np
+from tqdm import tqdm
+import torch
+import torch.nn.functional as F
+from torch.utils.tensorboard import SummaryWriter
+from torchvision.utils import save_image
+from nerfacc import OccupancyGrid
+import lpips
+import kornia
+import trimesh
+import pymeshlab
+import pymeshfix
+from pytorch3d.utils import ico_sphere
+
+from cora.extract_geometry import extract_geometry
+from cora.mesh_renderer import MeshRenderer
+from cora.dataset import MetaShapeDataset as AvatarDataset
+from cora.renderer import ObjSDFRenderer as Renderer
+from cora.renderer import Rays
+from cora.model import NeuSAvatar as Network
 
 
 class Trainer:
@@ -489,7 +489,7 @@ class Trainer:
             specular_list = torch.cat(specular_list, dim=0).reshape(h, w, -1).permute(2, 0, 1)
             roughness_list = torch.cat(roughness_list, dim=0).reshape(h, w, -1).permute(2, 0, 1)
             normal_list = torch.cat(normal_list, dim=0).reshape(h, w, -1).permute(2, 0, 1)
-            save_image(diff_list, diff_save_path)
+            save_image(diff_list ** (1 / 2.2), diff_save_path)
             save_image(specular_list, spec_save_path)
             save_image(roughness_list, rough_save_path)
             save_image((normal_list + 1) / 2, normal_save_path)

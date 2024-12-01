@@ -15,3 +15,5 @@ blender/blender-3.1.0-linux-x64/*
 
 face_detection/*
 face_alignment/*
+
+*.sh
