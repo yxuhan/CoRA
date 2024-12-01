@@ -159,5 +159,17 @@ python enlarge_specular.py --data_root ../../workspace/data/old_neutral
 cd ../..
 ```
 
+### (Optional) Step 5: Align camera coordinate
+Use the fitted FLAME mesh from Step 4 to transform the Metashape camera coordinate into canonical space:
+```
+cd scripts/AlbedoMMFitting
+python align_mesh.py \
+    --data_root ../../workspace/data/old_neutral \
+    --fitting_pkl_path ../../workspace/fitting/old_neutral
+python enlarge_specular.py --data_root ../../workspace/data/old_neutral
+cd ../..
+```
+This script would output `transforms_aligned.json` under the `dataroot`, you can modify `meta_path` in the config file from `xxx/transforms.json` to `xxx/transforms_aligned.json` if you want the reconstruted geometry in the canonical space with fixed scale and orientation.
+
 ## In the end
 Congratulations! If you have successfully done the following steps, you can goto RUN.md to reconstruct your own high-quality relightable scan! 

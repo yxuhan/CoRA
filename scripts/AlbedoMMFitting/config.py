@@ -88,6 +88,9 @@ def parse_args():
     parser.add_argument('--fitting_path', type=str, default="")
     parser.add_argument('--transforms_path', type=str, default="")
 
+    # for align mesh
+    parser.add_argument('--fitting_pkl_path', type=str, default="")
+
     args = parser.parse_args()
     print(args, end='\n\n')
 
@@ -101,6 +104,8 @@ def parse_args():
     cfg.save_root = args.save_root
     cfg.fitting_path = args.fitting_path
     cfg.transforms_path = args.transforms_path
+
+    cfg.fitting_pkl_path = args.fitting_pkl_path
 
     return cfg
 

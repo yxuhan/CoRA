@@ -35,6 +35,9 @@ class MetaShapeDataset(Dataset):
         self.device = device
         self.mode = mode
 
+        transform_name = os.path.basename(meta_path)
+        assert transform_name in ["transforms.json", "transforms_aligned.json"]
+
         meta_file_path = meta_path
         with open(meta_file_path, 'r') as f:
             meta = json.load(f)
@@ -74,7 +77,8 @@ class MetaShapeDataset(Dataset):
         self.leye_masks, self.reye_masks, self.bfm_albedos = [], [], []
         for f_id in tqdm(range(self.num_frames)):
             cur_pose = np.array(frames[f_id]['transform_matrix'], dtype=np.float32)
-            cur_pose = nerf_matrix_to_ngp(cur_pose, scale=1.)
+            if transform_name == "transforms.json":
+                cur_pose = nerf_matrix_to_ngp(cur_pose, scale=1.)
             self.cam2world.append(cur_pose)
             img_name = os.path.basename(frames[f_id]['file_path'])
             img = self._load_img(os.path.join(image_dir, img_name))
