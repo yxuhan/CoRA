@@ -1,5 +1,6 @@
 ### News
-* `2024/5/11` We are working on a journal extension of CoRA where the eyeball position and radius are **automatically solved** from the data instead of manually set as in the CVPR'24 version; this part of code is now released! Stay tuned for the journal version paper.
+* `2026/5/1` The journal extension of CoRA is accepted by IJCV'26.
+* `2024/5/11` We are working on a journal extension of CoRA where the eyeball position and radius are **automatically solved** from the data instead of manually set as in the CVPR'24 version; this part of code is now released!
 * `2024/5/11` We have released the scripts and instructions to run on custom data!
 * `2024/3/3` We have released the full code to run on our preprocessed dataset, see [Run.md](docs/Run.md) for more details.
 
@@ -10,7 +11,7 @@
 
 This is a PyTorch implementation of the following paper:
 
-**High-Quality Facial Geometry and Appearance Capture at Home**, CVPR 2024.
+**High-Quality Facial Geometry and Appearance Capture at Home**, CVPR 2024 & IJCV 2026.
 
 Yuxuan Han, Junfeng Lyu, and Feng Xu
 
