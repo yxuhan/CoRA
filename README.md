@@ -32,8 +32,7 @@ We also plan to create a video toturial to help users to create their own religh
 ## Contact
 If you have any questions, please contact Yuxuan Han (hanyx22@mails.tsinghua.edu.cn).
 
-## License and Citation
-This repository can <b>only be used for personal/research/non-commercial purposes</b>.
+## Citation
 Please cite the following paper if it helps your research:
 
     @inproceedings{han2024cora,
