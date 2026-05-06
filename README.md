@@ -42,6 +42,13 @@ Please cite the following paper if it helps your research:
         year={2024}
     }
 
+    @inproceedings{han2026cora++,
+        author = {Xu, Feng and Han, Yuxuan and Lyu, Junfeng},
+        title = {High-Quality Facial Geometry and Appearance Capture at Home},
+        journal={IJCV},
+        year={2026}
+    }
+
 ## Acknowledgments
 * The code is built on a bunch of wonderful projects, including: [Nerfacc](https://github.com/nerfstudio-project/nerfacc), [tinycudann](https://github.com/NVlabs/tiny-cuda-nn), [facer](https://github.com/FacePerceiver/facer), [metrical-tracker](https://github.com/Zielon/metrical-tracker), [AlbedoMM](https://github.com/waps101/AlbedoMM), [RobustVideoMatting](https://github.com/PeterL1n/RobustVideoMatting), and [WildLight](https://github.com/za-cheng/WildLight).
 * Thanks [SoulShell](http://soulshell.cn/) for providing their Light Stage to help us conduct comparison experiments.
